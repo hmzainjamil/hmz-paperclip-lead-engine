@@ -1,127 +1,103 @@
 # hmz-paperclip-lead-engine
+> Autonomous lead generation — Vibe Prospecting → Apollo → Excel → outreach. Part of the DigiMinds Paperclip automation engine suite.
 
-> **Autonomous lead generation + enrichment engine | runs 7:30 AM daily | zero manual prospecting**
+[![paperclip](https://img.shields.io/badge/Paperclip-engine-blue?style=flat&labelColor=555)](https://github.com/paperclipai/paperclip)
+[![mae](https://img.shields.io/badge/MAE-powered-green?style=flat&labelColor=555)](.)
+[![tools](https://img.shields.io/badge/tools-Vibe-orange?style=flat&labelColor=555)](.)
+[![tier0](https://img.shields.io/badge/tier0-zero--cost-purple?style=flat&labelColor=555)](.)
+[![license](https://img.shields.io/badge/license-MIT-lightgrey?style=flat&labelColor=555)](LICENSE)
 
-[![schedule](https://img.shields.io/badge/schedule-7%3A30AM_daily-blue?style=flat)](.) [![leads](https://img.shields.io/badge/output-qualified_leads-green?style=flat)](.) [![status](https://img.shields.io/badge/status-always_on-brightgreen?style=flat)](.) [![company](https://img.shields.io/badge/company-DigiMinds-orange?style=flat)](.)
-
-[Overview](#overview) · [Pipeline](#pipeline) · [Sources](#sources) · [Output](#output) · [Config](#config) · [Tips](#tips)
-
----
-
-## 🧠 OVERVIEW
-
-Paperclip Lead Engine runs at 7:30 AM every morning. It scrapes qualified leads from LinkedIn, Apollo, and job boards — enriches them with company data — scores them against DigiMinds ICP — and drops them directly into the CRM pipeline. HMZ wakes up to a pre-filled, pre-scored lead list.
-
-| Component | Value |
-|---|---|
-| Trigger | Daily 7:30 AM (LaunchAgent) |
-| Sources | LinkedIn, Apollo, Indeed, job boards |
-| ICP | PPC/Google Ads/Meta Ads businesses, $1K-$50K/mo spend |
-| Output | Enriched leads → Paperclip CRM |
-| Model | Groq Llama 3 (zero Claude tokens) |
+[concepts](#concepts) · [architecture](#architecture) · [tips](#tips) · [startups](#startups) · [star](#star)
 
 ---
 
-## ⚙️ PIPELINE
+## 🧠 CONCEPTS <a id="concepts"></a>
 
-```
-07:30 AM trigger
-    │
-    ├─► Scrape LinkedIn (Apify actor: linkedin-jobs-scraper)
-    ├─► Search Apollo: title=Marketing Manager, industry=ecommerce
-    ├─► Pull Indeed: "google ads" + "meta ads" job postings
-    │
-    ├─► Enrich each lead: company revenue, ad spend signals, tech stack
-    ├─► ICP score: 0-100 (80+ = hot, 50-79 = warm, <50 = cold)
-    │
-    └─► POST /api/leads → Paperclip CRM with score + enrichment
-```
-
-| Stage | Tool | Time |
+| Feature | Location | Description |
 |---|---|---|
-| Scrape | Apify actors (LinkedIn, Apollo) | ~3 min |
-| Enrich | Apollo bulk enrich API | ~2 min |
-| Score | Groq Llama 3 (ICP rules) | ~1 min |
-| Store | Paperclip CRM API | <30s |
+| [**Core Engine**](engine/) | `engine/` | Main orchestration loop — reads from Paperclip → executes → reports back |
+| [**Paperclip Sync**](sync/) | `sync/` | Bidirectional sync with Paperclip API at localhost:3100 |
+| [**MAE Integration**](mae/) | `mae/` | Routes tasks through MAE swarm — wave-batched, RAM-safe |
+| [**Tier 0 Routing**](routing/) | `routing/` | Tools used: Vibe MCP · Apollo MCP · openpyxl |
+| [**Output Storage**](outputs/) | `outputs/` | Results saved to `~/.claude/tcc-logs/` + synced to Paperclip |
+| [**LaunchAgent**](launchagents/) | `launchagents/` | Optional persistent LaunchAgent — runs engine on schedule |
+
+### 🔥 Hot
+
+| Feature | Location | Description |
+|---|---|---|
+| [**Zero-cost execution**](engine/) | `engine/` | All processing via Tier 0 models — Groq, Gemini, Kimi, Bytez |
+| [**Auto-retry**](engine/) | `engine/` | Failed tasks auto-retry with fallback model via TCC retry mechanism |
+| [**Paperclip goal sync**](sync/) | `sync/` | Reads outstanding goals from Paperclip every run cycle |
 
 ---
 
-## 🎯 ICP SCORING RULES
+## ⚙️ ARCHITECTURE <a id="architecture"></a>
 
-| Signal | Points |
-|---|---|
-| Active Google Ads spend detected | +30 |
-| Active Meta Ads spend detected | +20 |
-| Company size 10-200 employees | +15 |
-| Industry: ecommerce, DTC, SaaS | +20 |
-| Job post mentions PPC/CRO/ROAS | +25 |
-| No agency relationship evident | +15 |
-| LinkedIn ad library shows active creatives | +20 |
-
-**Threshold:** 80+ = hot (direct outreach), 50-79 = warm (nurture), <50 = discard
-
----
-
-## 💡 TIPS
-
-■ **Lead Quality (5)**
-| Tip | Source |
-|---|---|
-| Best leads come from companies posting PPC job roles — they have budget but no one to run it | Prospecting SOP |
-| LinkedIn ad library signals are the strongest ICP indicator | DigiMinds playbook |
-| Apollo bulk enrich is 10x faster than individual enrichment | Apollo docs |
-| Discard all India/Pakistan/Bangladesh/Philippines/Israel geos | HMZ blacklist |
-| Companies spending $5K+/mo on ads = perfect DigiMinds client | ICP definition |
-
-■ **Operations (4)**
-| Tip | Source |
-|---|---|
-| Engine runs even on weekends — leads accumulate for Monday review | Schedule SOP |
-| If Apify actor fails, fallback to Apollo search only | Error handling |
-| Check `/api/leads?date=today` to see today's batch | API ref |
-| ICP scores are recalculated weekly as rules improve | Auto-learning |
-
----
-
-## ☠️ TOOLS REPLACED
-
-| Lead Engine | Replaced |
-|---|---|
-| Automated daily prospecting | Manual LinkedIn sourcing (2h/day) |
-| ICP scoring | Gut-feel qualification |
-| Lead enrichment | Manual Google/LinkedIn research |
-| CRM entry | Copy-paste into spreadsheets |
-
----
-
-## ⚠️ GOTCHAS
-
-| Issue | Fix |
-|---|---|
-| Apify actor rate-limited | Engine auto-retries at 8:30 AM |
-| Apollo credits exhausted | Falls back to basic LinkedIn data only |
-| 0 leads scored above 50 | ICP rules too strict — review thresholds |
-| Duplicate leads in CRM | Engine deduplicates by LinkedIn URL |
-| Engine ran late (after 8 AM) | LaunchAgent StartCalendarInterval can drift — verify with `launchctl list` |
-
----
-
-## 🚀 SETUP
-
-```bash
-# Check lead engine status
-curl http://127.0.0.1:3100/api/leads?date=today
-
-# View logs
-tail -f ~/Library/Logs/paperclip-lead-engine.log
-
-# Manual trigger
-~/.claude/bin/paperclip-lead-engine
-
-# See all hot leads (score 80+)
-curl "http://127.0.0.1:3100/api/leads?score_min=80&date=today"
+```
+Paperclip CEO Layer (localhost:3100)
+         │
+         │ reads goals + tasks
+         ▼
+    Lead Engine Engine
+         │
+    MAE decompose
+         │
+    Tier 0 swarm (Vibe MCP · Apollo MCP · openpyxl)
+         │
+    synthesis + output
+         │
+         │ reports results
+         ▼
+Paperclip CEO Layer (updated goals)
 ```
 
+| Phase | Model | Purpose |
+|---|---|---|
+| Decompose | Groq llama-3.1-8b-instant | Break goal into sub-tasks |
+| Execute | Vibe MCP + more | Run specialist tasks |
+| Synthesize | Groq llama-3.3-70b-versatile | Merge outputs |
+| Report | Paperclip API | Update goal status |
+
 ---
 
-*Part of [DigiMinds AI Agency Stack](https://github.com/hmzainjamil) — Paperclip autonomous lead generation*
+## 💡 TIPS AND TRICKS (8) <a id="tips"></a>
+
+[engine-ops](#tips-ops) · [paperclip-integration](#tips-pc)
+
+<a id="tips-ops"></a>
+■ **Engine Operations (4)**
+
+| Tip | Source |
+|---|---|
+| Start: `python3 engine/main.py` or load LaunchAgent for persistent operation | [hmzainjamil](https://github.com/hmzainjamil) |
+| `mae run "goal"` triggers this engine via TCC routing when keyword matches | [hmzainjamil](https://github.com/hmzainjamil) |
+| All outputs go to `~/.claude/tcc-logs/mae-TIMESTAMP.md` — searchable history | [hmzainjamil](https://github.com/hmzainjamil) |
+| `tcc watch` monitors engine task queue in real-time — see active/pending/done | [hmzainjamil](https://github.com/hmzainjamil) |
+
+<a id="tips-pc"></a>
+■ **Paperclip Integration (4)**
+
+| Tip | Source |
+|---|---|
+| Paperclip must be running: `cd ~/installed-repos/paperclip && pnpm dev` | [Paperclip AI](https://github.com/paperclipai) |
+| Company ID `c5066522-bacc-4a28-b700-6590cbe366ec` scopes all API calls to DigiMinds | [hmzainjamil](https://github.com/hmzainjamil) |
+| Engine falls back to `llm-burst` if Paperclip API returns 404 | [hmzainjamil](https://github.com/hmzainjamil) |
+| Set engine goals via Paperclip dashboard → engine picks up on next run cycle | [Paperclip AI](https://github.com/paperclipai) |
+
+---
+
+## ☠️ STARTUPS / BUSINESSES <a id="startups"></a>
+
+| Feature | Replaced |
+|---|---|
+| **Autonomous engine loop** | [AutoGPT](https://autogpt.net), [AgentGPT](https://agentgpt.reworkd.ai), [BabyAGI](https://github.com/yoheinakajima/babyagi) |
+| **Paperclip company OS** | [Notion AI](https://notion.so), [Monday.com](https://monday.com), [Asana](https://asana.com) |
+| **Zero-cost Tier 0 execution** | [CrewAI Cloud](https://crewai.com), [LangSmith](https://smith.langchain.com) |
+| **MAE swarm synthesis** | [LangGraph](https://langgraph.com), [AutoGen](https://github.com/microsoft/autogen) |
+
+---
+
+## Star History <a id="star"></a>
+
+[![Star History Chart](https://api.star-history.com/svg?repos=hmzainjamil/hmz-paperclip-lead-engine&type=Date)](https://star-history.com/#hmzainjamil/hmz-paperclip-lead-engine&Date)
